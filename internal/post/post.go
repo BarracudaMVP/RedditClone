@@ -11,8 +11,8 @@ type Post struct {
 	Title            string    `json:"title"`
 	Category         Category  `json:"category"`
 	Type             PostType  `json:"type"`
-	URL              *string   `json:"url,omitempty"`
-	Text             *string   `json:"text,omitempty"`
+	URL              string    `json:"url,omitzero"`
+	Text             string    `json:"text,omitzero"`
 	Author           user.User `json:"author"`
 	Score            int64     `json:"score"`
 	Votes            []Vote    `json:"votes"`

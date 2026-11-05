@@ -1,6 +1,9 @@
 package main
 
 import (
+	"RedditClone/internal/handlers"
+	"RedditClone/internal/middleware"
+	"RedditClone/internal/post"
 	"log"
 	"net/http"
 )
@@ -11,6 +14,9 @@ var (
 )
 
 func newMux(staticDir string) *http.ServeMux {
+
+	postRepo := post.NewMemoryPostRepository()
+
 	mux := http.NewServeMux()
 	fs := http.FileServer(http.Dir(staticDir))
 	mux.Handle("/static/", http.StripPrefix("/static/", fs))
@@ -31,16 +37,19 @@ func newMux(staticDir string) *http.ServeMux {
 	mux.Handle("/api", http.NotFoundHandler())
 	mux.Handle("/api/", http.NotFoundHandler())
 
-	//mux.HandleFunc("GET /posts", ))
-	//mux.HandleFunc("GET /posts/{$}", _)
+	postHandler := handlers.NewPostHandler(postRepo)
+
+	mux.HandleFunc("GET /api/posts", postHandler.List)
+	mux.HandleFunc("GET /api/posts/{$}", postHandler.List)
 	return mux
 }
 
 func main() {
 	mux := newMux(staticDir)
+	loggedMux := middleware.Logging(mux)
 	server := http.Server{
 		Addr:    addr,
-		Handler: mux,
+		Handler: loggedMux,
 	}
 	log.Printf("starting server at %s", addr)
 	err := server.ListenAndServe()
