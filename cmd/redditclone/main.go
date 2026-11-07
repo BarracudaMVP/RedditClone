@@ -13,7 +13,7 @@ var (
 	staticDir = "./static"
 )
 
-func newMux(staticDir string) *http.ServeMux {
+func newMux(staticDir string) http.Handler {
 
 	postRepo := post.NewMemoryPostRepository()
 
@@ -40,16 +40,18 @@ func newMux(staticDir string) *http.ServeMux {
 	postHandler := handlers.NewPostHandler(postRepo)
 
 	mux.HandleFunc("GET /api/posts", postHandler.List)
-	mux.HandleFunc("GET /api/posts/{$}", postHandler.List)
+	mux.HandleFunc("GET /api/posts/", postHandler.List)
+	mux.HandleFunc("GET /api/post/{postID}", postHandler.GetPost)
+	mux.HandleFunc("GET /api/posts/{category}", postHandler.ListByCategory)
 	return mux
 }
 
 func main() {
 	mux := newMux(staticDir)
-	loggedMux := middleware.Logging(mux)
+	mux = middleware.Logging(mux)
 	server := http.Server{
 		Addr:    addr,
-		Handler: loggedMux,
+		Handler: mux,
 	}
 	log.Printf("starting server at %s", addr)
 	err := server.ListenAndServe()
