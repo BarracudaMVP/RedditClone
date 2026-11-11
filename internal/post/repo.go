@@ -59,8 +59,8 @@ func (repo *MemoryPostRepository) GetCategory(c Category) []Post {
 }
 
 func (repo *MemoryPostRepository) GetByID(id id.ID) (Post, error) {
-	repo.mu.RLock()
-	defer repo.mu.RUnlock()
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
 	for i := range repo.Posts {
 		if repo.Posts[i].ID == id {
 			repo.Posts[i].IncrementViews()

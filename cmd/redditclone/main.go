@@ -5,18 +5,22 @@ import (
 	"RedditClone/internal/middleware"
 	"RedditClone/internal/post"
 	"RedditClone/internal/user"
+	"errors"
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/joho/godotenv"
 )
 
 var (
 	addr      = ":8080"
 	staticDir = "./static"
-	jwtSecret = []byte(os.Getenv("JWT_SECRET"))
+
+	dummyPassword = "DUMMY_PASSWORD"
 )
 
-func newMux(staticDir string) http.Handler {
+func newMux(staticDir string, jwtSecret []byte, dummyHash string) http.Handler {
 
 	postRepo := post.NewMemoryPostRepository()
 	userRepo := user.NewMemoryUserRepository()
@@ -42,7 +46,7 @@ func newMux(staticDir string) http.Handler {
 	mux.Handle("/api/", http.NotFoundHandler())
 
 	postHandler := handlers.NewPostHandler(postRepo)
-	userHandler := handlers.NewUserHandler(userRepo, jwtSecret)
+	userHandler := handlers.NewUserHandler(userRepo, jwtSecret, dummyHash)
 
 	mux.HandleFunc("GET /api/posts", postHandler.List)
 	mux.HandleFunc("GET /api/posts/", postHandler.List)
@@ -54,14 +58,25 @@ func newMux(staticDir string) http.Handler {
 }
 
 func main() {
-	mux := newMux(staticDir)
+	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.Fatalf("load .env: %v", err)
+	}
+	jwtSecret := []byte(os.Getenv("JWT_SECRET"))
+	if len(jwtSecret) == 0 {
+		log.Fatalf("JWT_SECRET is required")
+	}
+	dummyHash, err := user.HashPassword(dummyPassword)
+	if err != nil {
+		log.Fatalf("generate dummy password hash: %v", err)
+	}
+	mux := newMux(staticDir, jwtSecret, dummyHash)
 	mux = middleware.Logging(mux)
 	server := http.Server{
 		Addr:    addr,
 		Handler: mux,
 	}
 	log.Printf("starting server at %s", addr)
-	err := server.ListenAndServe()
+	err = server.ListenAndServe()
 	if err != nil {
 		log.Fatalf("http failed: %v", err)
 	}

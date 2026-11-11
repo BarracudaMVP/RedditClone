@@ -8,6 +8,7 @@ import (
 )
 
 var ErrUserExists = errors.New("user with current username exists")
+var ErrUserNotFound = errors.New("user not found")
 
 type UserRepository interface {
 	Create(username Username, passwordHash string) (User, error)
@@ -55,7 +56,7 @@ func (repo *MemoryUserRepository) Create(username Username, passwordHash string)
 	}
 	var uid id.ID
 	for {
-		uid, err := id.NewID()
+		uid, err = id.NewID()
 		if err != nil {
 			return User{}, err
 		}
@@ -77,5 +78,12 @@ func (repo *MemoryUserRepository) Create(username Username, passwordHash string)
 }
 
 func (repo *MemoryUserRepository) GetByUsername(username Username) (StoredUser, error) {
-	return StoredUser{}, nil
+	repo.mu.RLock()
+	defer repo.mu.RUnlock()
+	for i := range repo.storedUsers {
+		if strings.EqualFold(string(repo.storedUsers[i].User.Username), string(username)) {
+			return repo.storedUsers[i], nil
+		}
+	}
+	return StoredUser{}, ErrUserNotFound
 }
