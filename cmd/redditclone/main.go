@@ -4,18 +4,22 @@ import (
 	"RedditClone/internal/handlers"
 	"RedditClone/internal/middleware"
 	"RedditClone/internal/post"
+	"RedditClone/internal/user"
 	"log"
 	"net/http"
+	"os"
 )
 
 var (
 	addr      = ":8080"
 	staticDir = "./static"
+	jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 )
 
 func newMux(staticDir string) http.Handler {
 
 	postRepo := post.NewMemoryPostRepository()
+	userRepo := user.NewMemoryUserRepository()
 
 	mux := http.NewServeMux()
 	fs := http.FileServer(http.Dir(staticDir))
@@ -38,11 +42,14 @@ func newMux(staticDir string) http.Handler {
 	mux.Handle("/api/", http.NotFoundHandler())
 
 	postHandler := handlers.NewPostHandler(postRepo)
+	userHandler := handlers.NewUserHandler(userRepo, jwtSecret)
 
 	mux.HandleFunc("GET /api/posts", postHandler.List)
 	mux.HandleFunc("GET /api/posts/", postHandler.List)
 	mux.HandleFunc("GET /api/post/{postID}", postHandler.GetPost)
 	mux.HandleFunc("GET /api/posts/{category}", postHandler.ListByCategory)
+	mux.HandleFunc("POST /api/register", userHandler.Register)
+	mux.HandleFunc("POST /api/login", userHandler.Login)
 	return mux
 }
 

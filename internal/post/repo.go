@@ -14,11 +14,20 @@ var ErrPostNotFound = errors.New("post not found")
 type PostRepository interface {
 	GetAll() []Post
 	GetByID(id id.ID) (Post, error)
-	GetCategory(Category) []Post
+	GetCategory(category Category) []Post
 }
 type MemoryPostRepository struct {
 	Posts []Post
 	mu    sync.RWMutex
+}
+
+func (repo *MemoryPostRepository) existsByID(id id.ID) bool {
+	for i := range repo.Posts {
+		if id == repo.Posts[i].ID {
+			return true
+		}
+	}
+	return false
 }
 
 func (repo *MemoryPostRepository) GetAll() []Post {
