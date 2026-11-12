@@ -1,26 +1,17 @@
 package main
 
 import (
+	"RedditClone/internal/config"
 	"RedditClone/internal/handlers"
 	"RedditClone/internal/middleware"
 	"RedditClone/internal/post"
 	"RedditClone/internal/user"
-	"errors"
 	"log"
 	"net/http"
-	"os"
-
-	"github.com/joho/godotenv"
 )
 
-var (
-	addr      = ":8080"
-	staticDir = "./static"
-
-	dummyPassword = "DUMMY_PASSWORD"
-)
-
-func newMux(staticDir string, jwtSecret []byte, dummyHash string) http.Handler {
+func newMux(cfg *config.Config) http.Handler {
+	staticDir := cfg.StaticDir
 
 	postRepo := post.NewMemoryPostRepository()
 	userRepo := user.NewMemoryUserRepository()
@@ -46,36 +37,29 @@ func newMux(staticDir string, jwtSecret []byte, dummyHash string) http.Handler {
 	mux.Handle("/api/", http.NotFoundHandler())
 
 	postHandler := handlers.NewPostHandler(postRepo)
-	userHandler := handlers.NewUserHandler(userRepo, jwtSecret, dummyHash)
+	userHandler := handlers.NewUserHandler(userRepo, cfg)
 
 	mux.HandleFunc("GET /api/posts", postHandler.List)
-	mux.HandleFunc("GET /api/posts/", postHandler.List)
-	mux.HandleFunc("GET /api/post/{postID}", postHandler.GetPost)
+	mux.HandleFunc("GET /api/posts/{$}", postHandler.List)
 	mux.HandleFunc("GET /api/posts/{category}", postHandler.ListByCategory)
+	mux.HandleFunc("GET /api/post/{postID}", postHandler.GetPost)
 	mux.HandleFunc("POST /api/register", userHandler.Register)
 	mux.HandleFunc("POST /api/login", userHandler.Login)
 	return mux
 }
 
 func main() {
-	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
-		log.Fatalf("load .env: %v", err)
-	}
-	jwtSecret := []byte(os.Getenv("JWT_SECRET"))
-	if len(jwtSecret) == 0 {
-		log.Fatalf("JWT_SECRET is required")
-	}
-	dummyHash, err := user.HashPassword(dummyPassword)
+	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("generate dummy password hash: %v", err)
+		log.Fatalf("load config: %v", err)
 	}
-	mux := newMux(staticDir, jwtSecret, dummyHash)
+	mux := newMux(cfg)
 	mux = middleware.Logging(mux)
 	server := http.Server{
-		Addr:    addr,
+		Addr:    cfg.HTTPAddr,
 		Handler: mux,
 	}
-	log.Printf("starting server at %s", addr)
+	log.Printf("starting server at %s", server.Addr)
 	err = server.ListenAndServe()
 	if err != nil {
 		log.Fatalf("http failed: %v", err)

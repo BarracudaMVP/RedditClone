@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"RedditClone/internal/config"
 	"RedditClone/internal/user"
 	"encoding/json"
 	"errors"
@@ -12,15 +13,13 @@ import (
 
 type UserHandler struct {
 	Repository user.UserRepository
-	JWTSecret  []byte
-	DummyHash  string
+	Cfg        *config.Config
 }
 
-func NewUserHandler(repo user.UserRepository, secret []byte, dummyHash string) *UserHandler {
+func NewUserHandler(repo user.UserRepository, cfg *config.Config) *UserHandler {
 	return &UserHandler{
 		Repository: repo,
-		JWTSecret:  secret,
-		DummyHash:  dummyHash,
+		Cfg:        cfg,
 	}
 }
 
@@ -52,7 +51,7 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 		writeJSONValidationError(w, validateErrors)
 		return
 	}
-	passwordHash, err := user.HashPassword(form.Password)
+	passwordHash, err := user.HashPassword(form.Password, h.Cfg.BcryptConfig.Cost)
 	if err != nil {
 		log.Printf("hash password: %v", err)
 		writeJSONError(w, http.StatusInternalServerError, "internal server error")
@@ -68,7 +67,7 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
-	tokenString, err := user.CreateToken(u, h.JWTSecret)
+	tokenString, err := user.CreateToken(u, h.Cfg.JWT.Secret, h.Cfg.JWT.TTL)
 	if err != nil {
 		log.Printf("sign token: %v", err)
 		writeJSONError(w, http.StatusInternalServerError, "cannot sign token")
@@ -111,7 +110,7 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	storedUser, err := h.Repository.GetByUsername(form.Username)
 	if err != nil {
 		if errors.Is(err, user.ErrUserNotFound) {
-			user.CheckPasswordHash(h.DummyHash, form.Password)
+			user.CheckPasswordHash(h.Cfg.BcryptConfig.DummyHash, form.Password)
 			writeJSONError(w, http.StatusUnauthorized, "invalid username or password")
 			return
 		}
@@ -122,7 +121,7 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusUnauthorized, "invalid username or password")
 		return
 	}
-	tokenString, err := user.CreateToken(storedUser.User, h.JWTSecret)
+	tokenString, err := user.CreateToken(storedUser.User, h.Cfg.JWT.Secret, h.Cfg.JWT.TTL)
 	if err != nil {
 		log.Printf("sign token: %v", err)
 		writeJSONError(w, http.StatusInternalServerError, "cannot sign token")

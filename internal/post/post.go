@@ -29,13 +29,6 @@ type Post struct {
 type Category string
 
 const (
-	musicCategory       Category = "music"
-	funnyCategory       Category = "funny"
-	videosCategory      Category = "videos"
-	programmingCategory Category = "programming"
-	newsCategory        Category = "news"
-	fashionCategory     Category = "fashion"
-
 	MinLengthCategory = 1
 )
 
@@ -65,13 +58,11 @@ type Comment struct {
 }
 
 func ParseCategory(value string) (Category, error) {
-	category := Category(strings.ToLower(value))
-	switch category {
-	case musicCategory, funnyCategory, videosCategory, programmingCategory, newsCategory, fashionCategory:
-		return category, nil
-	default:
+	if len(value) < MinLengthCategory {
 		return "", ErrInvalidCategory
 	}
+	category := Category(strings.ToLower(value))
+	return category, nil
 }
 func (p *Post) IncrementViews() {
 	p.Views++

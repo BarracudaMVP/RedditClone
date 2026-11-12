@@ -21,8 +21,6 @@ const (
 	MaxLengthUsername = 32
 	MinLengthPassword = 8
 	MaxLengthPassword = 72
-
-	tokenDuration = 7 * 24 * time.Hour
 )
 
 type User struct {
@@ -54,8 +52,8 @@ func ValidatePassword(password string) error {
 	return nil
 }
 
-func HashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+func HashPassword(password string, cost int) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), cost)
 	return string(bytes), err
 }
 
@@ -64,7 +62,7 @@ func CheckPasswordHash(hash, password string) bool {
 	return err == nil
 }
 
-func CreateToken(user User, secret []byte) (string, error) {
+func CreateToken(user User, secret []byte, tokenDuration time.Duration) (string, error) {
 	now := time.Now()
 	claims := &JwtClaims{
 		User: user,
