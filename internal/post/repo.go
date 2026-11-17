@@ -105,7 +105,12 @@ func NewMemoryPostRepository() *MemoryPostRepository {
 				Username: "alice",
 			},
 			Score: 0,
-			Votes: []Vote{},
+			Votes: []Vote{
+				{
+					User: "507f1f77bcf86cd799439011",
+					Vote: 1,
+				},
+			},
 			Comments: []Comment{
 				{
 					ID: "507f1f77bcf86cd799439016",

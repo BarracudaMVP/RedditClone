@@ -10,11 +10,8 @@ import (
 	"net/http"
 )
 
-func newMux(cfg *config.Config) http.Handler {
+func newMux(cfg *config.Config, postRepo post.PostRepository, userRepo user.UserRepository) *http.ServeMux {
 	staticDir := cfg.StaticDir
-
-	postRepo := post.NewMemoryPostRepository()
-	userRepo := user.NewMemoryUserRepository()
 
 	mux := http.NewServeMux()
 	fs := http.FileServer(http.Dir(staticDir))
@@ -42,7 +39,7 @@ func newMux(cfg *config.Config) http.Handler {
 	mux.HandleFunc("GET /api/posts", postHandler.List)
 	mux.HandleFunc("GET /api/posts/{$}", postHandler.List)
 	mux.HandleFunc("GET /api/posts/{category}", postHandler.ListByCategory)
-	mux.HandleFunc("GET /api/post/{postID}", postHandler.GetPost)
+	mux.HandleFunc("GET /api/post/{postId}", postHandler.GetPost)
 	mux.HandleFunc("POST /api/register", userHandler.Register)
 	mux.HandleFunc("POST /api/login", userHandler.Login)
 	return mux
@@ -53,11 +50,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
-	mux := newMux(cfg)
-	mux = middleware.Logging(mux)
+	postRepo := post.NewMemoryPostRepository()
+	userRepo := user.NewMemoryUserRepository()
+
+	mux := newMux(cfg, postRepo, userRepo)
+	handler := middleware.Auth(userRepo, cfg.JWT.Secret, mux)
+	handler = middleware.Logging(handler)
 	server := http.Server{
 		Addr:    cfg.HTTPAddr,
-		Handler: mux,
+		Handler: handler,
 	}
 	log.Printf("starting server at %s", server.Addr)
 	err = server.ListenAndServe()

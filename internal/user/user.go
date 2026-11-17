@@ -2,7 +2,9 @@ package user
 
 import (
 	"RedditClone/internal/id"
+	"context"
 	"errors"
+	"fmt"
 	"regexp"
 	"time"
 	"unicode/utf8"
@@ -33,7 +35,20 @@ type StoredUser struct {
 	User
 	PasswordHash string `json:"-"`
 }
+type userKey struct{}
 type Username string
+
+type Credentials struct {
+	Username Username `json:"username"`
+	Password string   `json:"password"`
+}
+type JwtClaims struct {
+	User User `json:"user"`
+	jwt.RegisteredClaims
+}
+type AuthenticationResponse struct {
+	Token string `json:"token"`
+}
 
 func ValidateUsername(username Username) error {
 	if len(username) < MinLengthUsername || len(username) > MaxLengthUsername {
@@ -75,15 +90,39 @@ func CreateToken(user User, secret []byte, tokenDuration time.Duration) (string,
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(secret)
 }
+func ParseToken(tokenString string, secret []byte) (User, error) {
+	claims := &JwtClaims{}
+	getSecret := func(*jwt.Token) (any, error) {
+		return secret, nil
+	}
+	_, err := jwt.ParseWithClaims(tokenString, claims, getSecret, jwt.WithValidMethods([]string{"HS256"}), jwt.WithExpirationRequired())
+	if err != nil {
+		return User{}, fmt.Errorf("ParseToken error: %w", err)
+	}
+	if _, err := id.ParseID(string(claims.User.ID)); err != nil {
+		return User{}, fmt.Errorf("validation ID error: %w", err)
+	}
+	if err := ValidateUsername(claims.User.Username); err != nil {
+		return User{}, fmt.Errorf("validation username error: %w", err)
+	}
 
-type Credentials struct {
-	Username Username `json:"username"`
-	Password string   `json:"password"`
+	if claims.IssuedAt == nil {
+		return User{}, fmt.Errorf("token issue error")
+	}
+	if claims.ExpiresAt == nil || !claims.ExpiresAt.Time.After(claims.IssuedAt.Time) {
+		return User{}, fmt.Errorf("token expire error")
+	}
+	return claims.User, nil
 }
-type JwtClaims struct {
-	User User `json:"user"`
-	jwt.RegisteredClaims
+
+func UserFromContext(ctx context.Context) (*User, error) {
+	sess, ok := ctx.Value(userKey{}).(*User)
+	if !ok || sess == nil {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	return sess, nil
 }
-type AuthenticationResponse struct {
-	Token string `json:"token"`
+
+func ContextWithUser(ctx context.Context, user *User) context.Context {
+	return context.WithValue(ctx, userKey{}, user)
 }

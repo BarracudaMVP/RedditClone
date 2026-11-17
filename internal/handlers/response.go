@@ -35,15 +35,15 @@ type ValidationErrorItem struct {
 	Msg      string        `json:"msg"`
 }
 
-func writeJSONError(w http.ResponseWriter, status int, value string) {
-	writeJSON(w, status, Error{
+func WriteJSONError(w http.ResponseWriter, status int, value string) {
+	WriteJSON(w, status, Error{
 		Message: value,
 	})
 }
-func writeJSONValidationError(w http.ResponseWriter, errors ValidationError) {
-	writeJSON(w, http.StatusUnprocessableEntity, errors)
+func WriteJSONValidationError(w http.ResponseWriter, errors ValidationError) {
+	WriteJSON(w, http.StatusUnprocessableEntity, errors)
 }
-func writeJSON(w http.ResponseWriter, status int, value any) {
+func WriteJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(value); err != nil {
