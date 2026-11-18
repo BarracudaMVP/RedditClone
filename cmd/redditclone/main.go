@@ -42,6 +42,8 @@ func newMux(cfg *config.Config, postRepo post.PostRepository, userRepo user.User
 	mux.HandleFunc("GET /api/post/{postId}", postHandler.GetPost)
 	mux.HandleFunc("POST /api/register", userHandler.Register)
 	mux.HandleFunc("POST /api/login", userHandler.Login)
+	mux.HandleFunc("POST /api/posts", postHandler.CreatePost)
+	mux.HandleFunc("POST /api/posts/{$}", postHandler.CreatePost)
 	return mux
 }
 

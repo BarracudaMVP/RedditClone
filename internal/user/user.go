@@ -14,6 +14,7 @@ import (
 )
 
 var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
 var ErrInvalidUsernameLength = errors.New("incorrect username length")
 var ErrInvalidUsernameFormat = errors.New("incorrect symbols in username")
 var ErrInvalidPasswordLength = errors.New("incorrect password length")
