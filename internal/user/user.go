@@ -117,11 +117,11 @@ func ParseToken(tokenString string, secret []byte) (User, error) {
 }
 
 func UserFromContext(ctx context.Context) (*User, error) {
-	sess, ok := ctx.Value(userKey{}).(*User)
-	if !ok || sess == nil {
+	session, ok := ctx.Value(userKey{}).(*User)
+	if !ok || session == nil {
 		return nil, fmt.Errorf("unauthorized")
 	}
-	return sess, nil
+	return session, nil
 }
 
 func ContextWithUser(ctx context.Context, user *User) context.Context {

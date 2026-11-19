@@ -76,4 +76,34 @@ func (h *PostHandler) CreatePost(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, http.StatusBadRequest, "cannot decode payload")
 		return
 	}
+	if err := post.ValidateTitle(form.Title); err != nil {
+		validateErrors.Add(BodyErrorLocation, "title", err.Error())
+	}
+	if err := post.ValidateCategory(string(form.Category)); err != nil {
+		validateErrors.Add(BodyErrorLocation, "category", err.Error())
+	}
+	switch form.Type {
+	case post.LinkPostType:
+		if err := post.ValidatePostURL(form.URL); err != nil {
+			validateErrors.Add(BodyErrorLocation, "url", err.Error())
+		}
+	case post.TextPostType:
+		if err := post.ValidatePostText(form.Text); err != nil {
+			validateErrors.Add(BodyErrorLocation, "text", err.Error())
+		}
+	default:
+		validateErrors.Add(BodyErrorLocation, "type", post.ErrInvalidPostType.Error())
+
+	}
+	if len(validateErrors.Errors) > 0 {
+		WriteJSONValidationError(w, validateErrors)
+		return
+	}
+	post, err := h.Repository.Create(form, *u)
+	if err != nil {
+		WriteJSONError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	WriteJSON(w, http.StatusCreated, post)
+
 }

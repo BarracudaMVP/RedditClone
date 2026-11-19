@@ -4,6 +4,7 @@ import (
 	"RedditClone/internal/id"
 	"RedditClone/internal/user"
 	"errors"
+	"net/url"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -16,7 +17,10 @@ var ErrInvalidTitleLength = errors.New("incorrect title length")
 
 var ErrInvalidTitleFormat = errors.New("incorrect symbols in title")
 
-var ErrInvalidTextPostLength = errors.New("incorrect text post length")
+var ErrInvalidPostType = errors.New("invalid post type")
+var ErrInvalidPostTextLength = errors.New("incorrect post text length")
+
+var ErrInvalidPostURLFormat = errors.New("incorrect post url")
 
 type Post struct {
 	ID               id.ID     `json:"id"`
@@ -42,7 +46,8 @@ const (
 	MaxLengthTitle    = 100
 	MinLengthComment  = 1
 	MaxLengthComment  = 2000
-	MinLengthTextPost = 4
+	MinLengthPostText = 4
+	MinLengthPostURL  = 0
 )
 
 type PostType string
@@ -99,22 +104,38 @@ func ValidateComment(value string) error {
 	return nil
 }
 
-func ValidateTextPost(value string) error {
-	length := utf8.RuneCountInString(value)
-	if length < MinLengthTextPost {
-		return ErrInvalidTextPostLength
-	}
-	return nil
-}
 func ParseCategory(value string) (Category, error) {
-	length := utf8.RuneCountInString(value)
-	if length < MinLengthCategory {
-		return "", ErrInvalidCategoryLength
+	if err := ValidateCategory(value); err != nil {
+		return "", err
 	}
 	category := Category(strings.ToLower(value))
 	return category, nil
 }
-func ValidatePostRequest(сpr CreatePostRequest) error {}
+func ValidateCategory(value string) error {
+	length := utf8.RuneCountInString(value)
+	if length < MinLengthCategory {
+		return ErrInvalidCategoryLength
+	}
+	return nil
+}
+func ValidatePostText(value string) error {
+	length := utf8.RuneCountInString(value)
+	if length < MinLengthPostText {
+		return ErrInvalidPostTextLength
+	}
+	return nil
+}
+
+func ValidatePostURL(value string) error {
+	u, err := url.Parse(value)
+	if err != nil {
+		return ErrInvalidPostURLFormat
+	}
+	if (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
+		return ErrInvalidPostURLFormat
+	}
+	return nil
+}
 func (p *Post) IncrementViews() {
 	p.Views++
 }

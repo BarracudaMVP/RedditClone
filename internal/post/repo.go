@@ -15,6 +15,7 @@ type PostRepository interface {
 	GetAll() []Post
 	GetByID(id id.ID) (Post, error)
 	GetCategory(category Category) []Post
+	Create(req CreatePostRequest, author user.User) (Post, error)
 }
 type MemoryPostRepository struct {
 	Posts []Post
@@ -128,4 +129,60 @@ func NewMemoryPostRepository() *MemoryPostRepository {
 		},
 	},
 	}
+}
+func (repo *MemoryPostRepository) Create(req CreatePostRequest, author user.User) (Post, error) {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	err := ValidateTitle(req.Title)
+	if err != nil {
+		return Post{}, err
+	}
+	category, err := ParseCategory(string(req.Category))
+	if err != nil {
+		return Post{}, err
+	}
+	switch req.Type {
+	case LinkPostType:
+		if err := ValidatePostURL(req.URL); err != nil {
+			return Post{}, err
+		}
+	case TextPostType:
+		if err := ValidatePostText(req.Text); err != nil {
+			return Post{}, err
+		}
+	default:
+		return Post{}, ErrInvalidPostType
+
+	}
+	var uid id.ID
+	for {
+		uid, err = id.NewID()
+		if err != nil {
+			return Post{}, err
+		}
+		if !repo.existsByID(uid) {
+			break
+		}
+	}
+	post := Post{
+		ID:       uid,
+		Title:    req.Title,
+		Category: category,
+		Type:     req.Type,
+		URL:      req.URL,
+		Text:     req.Text,
+		Author:   author,
+		Score:    1,
+		Votes: []Vote{{
+			User: author.ID,
+			Vote: 1,
+		},
+		},
+		Comments:         []Comment{},
+		Created:          time.Now(),
+		Views:            0,
+		UpvotePercentage: 100,
+	}
+	repo.Posts = append(repo.Posts, post)
+	return post, nil
 }
