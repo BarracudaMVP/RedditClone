@@ -51,6 +51,12 @@ type AuthenticationResponse struct {
 	Token string `json:"token"`
 }
 
+func ParseUsername(username string) (Username, error) {
+	if err := ValidateUsername(Username(username)); err != nil {
+		return "", err
+	}
+	return Username(username), nil
+}
 func ValidateUsername(username Username) error {
 	if len(username) < MinLengthUsername || len(username) > MaxLengthUsername {
 		return ErrInvalidUsernameLength

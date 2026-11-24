@@ -33,17 +33,31 @@ func newMux(cfg *config.Config, postRepo post.PostRepository, userRepo user.User
 	mux.Handle("/api", http.NotFoundHandler())
 	mux.Handle("/api/", http.NotFoundHandler())
 
-	postHandler := handlers.NewPostHandler(postRepo)
+	postHandler := handlers.NewPostHandler(postRepo, userRepo)
 	userHandler := handlers.NewUserHandler(userRepo, cfg)
 
 	mux.HandleFunc("GET /api/posts", postHandler.List)
 	mux.HandleFunc("GET /api/posts/{$}", postHandler.List)
 	mux.HandleFunc("GET /api/posts/{category}", postHandler.ListByCategory)
 	mux.HandleFunc("GET /api/post/{postId}", postHandler.GetPost)
+
+	//mux.HandleFunc("DELETE /api/post/{postId}", postHandler.DeletePost)
+
+	mux.HandleFunc("GET /api/user/{username}", postHandler.ListByUser)
+
 	mux.HandleFunc("POST /api/register", userHandler.Register)
 	mux.HandleFunc("POST /api/login", userHandler.Login)
+
 	mux.HandleFunc("POST /api/posts", postHandler.CreatePost)
 	mux.HandleFunc("POST /api/posts/{$}", postHandler.CreatePost)
+
+	//mux.HandleFunc("POST /api/posts/{postId}", postHandler.CreateComment)
+	//mux.HandleFunc("DELETE /api/posts/{postId}/{commentId}", postHandler.DeleteComment)
+
+	//mux.HandleFunc("GET /api/post/{postId}/upvote", postHandler.UpvotePost)
+	//mux.HandleFunc("GET /api/post/{postId}/downvote", postHandler.DownvotePost)
+	//mux.HandleFunc("GET /api/post/{postId}/unvote", postHandler.UnvotePost)
+
 	return mux
 }
 

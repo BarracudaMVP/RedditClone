@@ -12,16 +12,18 @@ import (
 )
 
 type PostHandler struct {
-	Repository post.PostRepository
+	postRepo post.PostRepository
+	userRepo user.UserRepository
 }
 
-func NewPostHandler(repo post.PostRepository) *PostHandler {
+func NewPostHandler(postRepo post.PostRepository, userRepo user.UserRepository) *PostHandler {
 	return &PostHandler{
-		Repository: repo,
+		postRepo: postRepo,
+		userRepo: userRepo,
 	}
 }
 func (h *PostHandler) List(w http.ResponseWriter, r *http.Request) {
-	p := h.Repository.GetAll()
+	p := h.postRepo.GetAll()
 	WriteJSON(w, http.StatusOK, p)
 }
 
@@ -31,7 +33,7 @@ func (h *PostHandler) ListByCategory(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, http.StatusBadRequest, "invalid category")
 		return
 	}
-	p := h.Repository.GetCategory(category)
+	p := h.postRepo.GetCategory(category)
 	WriteJSON(w, http.StatusOK, p)
 }
 
@@ -41,7 +43,7 @@ func (h *PostHandler) GetPost(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, http.StatusBadRequest, "invalid post id")
 		return
 	}
-	p, err := h.Repository.GetByID(postID)
+	p, err := h.postRepo.GetByID(postID)
 	if errors.Is(err, post.ErrPostNotFound) {
 		WriteJSONError(w, http.StatusNotFound, "post not found")
 		return
@@ -99,11 +101,27 @@ func (h *PostHandler) CreatePost(w http.ResponseWriter, r *http.Request) {
 		WriteJSONValidationError(w, validateErrors)
 		return
 	}
-	post, err := h.Repository.Create(form, *u)
+	post, err := h.postRepo.Create(form, *u)
 	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	WriteJSON(w, http.StatusCreated, post)
 
+}
+
+func (h *PostHandler) ListByUser(w http.ResponseWriter, r *http.Request) {
+	username, err := user.ParseUsername(r.PathValue("username"))
+	if err != nil {
+		WriteJSONError(w, http.StatusBadRequest, "bad request")
+		return
+	}
+
+	user, err := h.userRepo.GetByUsername(username)
+	if err != nil {
+		WriteJSONError(w, http.StatusNotFound, "user not found")
+		return
+	}
+	p := h.postRepo.GetByAuthorID(user.ID)
+	WriteJSON(w, http.StatusOK, p)
 }

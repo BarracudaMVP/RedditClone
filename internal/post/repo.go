@@ -15,6 +15,7 @@ type PostRepository interface {
 	GetAll() []Post
 	GetByID(id id.ID) (Post, error)
 	GetCategory(category Category) []Post
+	GetByAuthorID(author id.ID) []Post
 	Create(req CreatePostRequest, author user.User) (Post, error)
 }
 type MemoryPostRepository struct {
@@ -59,6 +60,22 @@ func (repo *MemoryPostRepository) GetCategory(c Category) []Post {
 	return result
 }
 
+func (repo *MemoryPostRepository) GetByAuthorID(author id.ID) []Post {
+	repo.mu.RLock()
+	posts := make([]Post, len(repo.Posts))
+	copy(posts, repo.Posts)
+	repo.mu.RUnlock()
+	result := make([]Post, 0)
+	for i := range posts {
+		if author == posts[i].Author.ID {
+			result = append(result, posts[i])
+		}
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Created.After(result[j].Created)
+	})
+	return result
+}
 func (repo *MemoryPostRepository) GetByID(id id.ID) (Post, error) {
 	repo.mu.Lock()
 	defer repo.mu.Unlock()
