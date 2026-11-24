@@ -27,18 +27,18 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	validateErrors := ValidationError{Errors: make([]ValidationErrorItem, 0)}
 	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || mediaType != "application/json" {
-		WriteJSONError(w, http.StatusBadRequest, "unknown payload")
+		WriteJSONError(w, http.StatusBadRequest, "bad request")
 		return
 	}
 
 	var form user.Credentials
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err := decoder.Decode(&form); err != nil {
-		WriteJSONError(w, http.StatusBadRequest, "cannot decode payload")
+		WriteJSONError(w, http.StatusBadRequest, "bad request")
 		return
 	}
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		WriteJSONError(w, http.StatusBadRequest, "cannot decode payload")
+		WriteJSONError(w, http.StatusBadRequest, "bad request")
 		return
 	}
 	if err := user.ValidateUsername(form.Username); err != nil {
@@ -70,7 +70,7 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	tokenString, err := user.CreateToken(u, h.Cfg.JWT.Secret, h.Cfg.JWT.TTL)
 	if err != nil {
 		log.Printf("sign token: %v", err)
-		WriteJSONError(w, http.StatusInternalServerError, "cannot sign token")
+		WriteJSONError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
@@ -83,18 +83,18 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	validateErrors := ValidationError{Errors: make([]ValidationErrorItem, 0)}
 	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || mediaType != "application/json" {
-		WriteJSONError(w, http.StatusBadRequest, "unknown payload")
+		WriteJSONError(w, http.StatusBadRequest, "bad request")
 		return
 	}
 
 	var form user.Credentials
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err := decoder.Decode(&form); err != nil {
-		WriteJSONError(w, http.StatusBadRequest, "cannot decode payload")
+		WriteJSONError(w, http.StatusBadRequest, "bad request")
 		return
 	}
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		WriteJSONError(w, http.StatusBadRequest, "cannot decode payload")
+		WriteJSONError(w, http.StatusBadRequest, "bad request")
 		return
 	}
 	if err := user.ValidateUsername(form.Username); err != nil {
@@ -111,20 +111,20 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, user.ErrUserNotFound) {
 			user.CheckPasswordHash(h.Cfg.BcryptConfig.DummyHash, form.Password)
-			WriteJSONError(w, http.StatusUnauthorized, "invalid username or password")
+			WriteJSONError(w, http.StatusUnauthorized, user.ErrUserNotFound.Error())
 			return
 		}
 		WriteJSONError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	if !user.CheckPasswordHash(storedUser.PasswordHash, form.Password) {
-		WriteJSONError(w, http.StatusUnauthorized, "invalid username or password")
+		WriteJSONError(w, http.StatusUnauthorized, user.ErrUserNotFound.Error())
 		return
 	}
 	tokenString, err := user.CreateToken(storedUser.User, h.Cfg.JWT.Secret, h.Cfg.JWT.TTL)
 	if err != nil {
 		log.Printf("sign token: %v", err)
-		WriteJSONError(w, http.StatusInternalServerError, "cannot sign token")
+		WriteJSONError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 

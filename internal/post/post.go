@@ -139,3 +139,12 @@ func ValidatePostURL(value string) error {
 func (p *Post) IncrementViews() {
 	p.Views++
 }
+
+func (p *Post) GetCommentByID(id id.ID) (Comment, bool) {
+	for i := range p.Comments {
+		if p.Comments[i].ID == id {
+			return p.Comments[i], true
+		}
+	}
+	return Comment{}, false
+}

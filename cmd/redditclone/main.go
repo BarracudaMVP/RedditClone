@@ -51,8 +51,8 @@ func newMux(cfg *config.Config, postRepo post.PostRepository, userRepo user.User
 	mux.HandleFunc("POST /api/posts", postHandler.CreatePost)
 	mux.HandleFunc("POST /api/posts/{$}", postHandler.CreatePost)
 
-	//mux.HandleFunc("POST /api/posts/{postId}", postHandler.CreateComment)
-	//mux.HandleFunc("DELETE /api/posts/{postId}/{commentId}", postHandler.DeleteComment)
+	mux.HandleFunc("POST /api/post/{postId}", postHandler.CreateComment)
+	//mux.HandleFunc("DELETE /api/post/{postId}/{commentId}", postHandler.DeleteComment)
 
 	//mux.HandleFunc("GET /api/post/{postId}/upvote", postHandler.UpvotePost)
 	//mux.HandleFunc("GET /api/post/{postId}/downvote", postHandler.DownvotePost)
