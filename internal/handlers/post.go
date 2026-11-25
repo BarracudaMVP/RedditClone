@@ -11,6 +11,8 @@ import (
 	"net/http"
 )
 
+var ErrBadRequest = errors.New("bad request")
+
 type PostHandler struct {
 	postRepo post.PostRepository
 	userRepo user.UserRepository
@@ -58,24 +60,24 @@ func (h *PostHandler) GetPost(w http.ResponseWriter, r *http.Request) {
 func (h *PostHandler) CreatePost(w http.ResponseWriter, r *http.Request) {
 	u, err := user.UserFromContext(r.Context())
 	if err != nil {
-		WriteJSONError(w, http.StatusUnauthorized, "unauthorized")
+		WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
 		return
 	}
 	validateErrors := ValidationError{Errors: make([]ValidationErrorItem, 0)}
 	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || mediaType != "application/json" {
-		WriteJSONError(w, http.StatusBadRequest, "bad request")
+		WriteJSONError(w, http.StatusBadRequest, ErrBadRequest.Error())
 		return
 	}
 
 	var form post.CreatePostRequest
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err := decoder.Decode(&form); err != nil {
-		WriteJSONError(w, http.StatusBadRequest, "bad request")
+		WriteJSONError(w, http.StatusBadRequest, ErrBadRequest.Error())
 		return
 	}
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		WriteJSONError(w, http.StatusBadRequest, "bad request")
+		WriteJSONError(w, http.StatusBadRequest, ErrBadRequest.Error())
 		return
 	}
 	if err := post.ValidateTitle(form.Title); err != nil {
@@ -113,7 +115,7 @@ func (h *PostHandler) CreatePost(w http.ResponseWriter, r *http.Request) {
 func (h *PostHandler) ListByUser(w http.ResponseWriter, r *http.Request) {
 	username, err := user.ParseUsername(r.PathValue("username"))
 	if err != nil {
-		WriteJSONError(w, http.StatusBadRequest, "bad request")
+		WriteJSONError(w, http.StatusBadRequest, ErrBadRequest.Error())
 		return
 	}
 
@@ -128,12 +130,12 @@ func (h *PostHandler) ListByUser(w http.ResponseWriter, r *http.Request) {
 func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	u, err := user.UserFromContext(r.Context())
 	if err != nil {
-		WriteJSONError(w, http.StatusUnauthorized, "unauthorized")
+		WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
 		return
 	}
 	pid, err := id.ParseID(r.PathValue("postId"))
 	if err != nil {
-		WriteJSONError(w, http.StatusBadRequest, "bad request")
+		WriteJSONError(w, http.StatusBadRequest, ErrBadRequest.Error())
 		return
 	}
 	if ok := h.postRepo.PostExistsByID(pid); !ok {
@@ -143,18 +145,18 @@ func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	validateErrors := ValidationError{Errors: make([]ValidationErrorItem, 0)}
 	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || mediaType != "application/json" {
-		WriteJSONError(w, http.StatusBadRequest, "bad request")
+		WriteJSONError(w, http.StatusBadRequest, ErrBadRequest.Error())
 		return
 	}
 
 	var form post.CreateCommentRequest
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err := decoder.Decode(&form); err != nil {
-		WriteJSONError(w, http.StatusBadRequest, "bad request")
+		WriteJSONError(w, http.StatusBadRequest, ErrBadRequest.Error())
 		return
 	}
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		WriteJSONError(w, http.StatusBadRequest, "bad request")
+		WriteJSONError(w, http.StatusBadRequest, ErrBadRequest.Error())
 		return
 	}
 	if err := post.ValidateComment(form.Comment); err != nil {
@@ -175,4 +177,47 @@ func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	}
 	WriteJSON(w, http.StatusCreated, p)
 
+}
+func (h *PostHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
+	u, err := user.UserFromContext(r.Context())
+	if err != nil {
+		WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
+		return
+	}
+	pid, err := id.ParseID(r.PathValue("postId"))
+	if err != nil {
+		WriteJSONError(w, http.StatusBadRequest, ErrBadRequest.Error())
+		return
+	}
+	if ok := h.postRepo.PostExistsByID(pid); !ok {
+		WriteJSONError(w, http.StatusNotFound, post.ErrPostNotFound.Error())
+		return
+	}
+	cid, err := id.ParseID(r.PathValue("commentId"))
+	if err != nil {
+		WriteJSONError(w, http.StatusBadRequest, ErrBadRequest.Error())
+		return
+	}
+	if ok := h.postRepo.CommentExistsByID(pid, cid); !ok {
+		WriteJSONError(w, http.StatusNotFound, post.ErrCommentNotFound.Error())
+		return
+	}
+	p, err := h.postRepo.DeleteComment(pid, cid, *u)
+	if err != nil {
+		if errors.Is(err, post.ErrPostNotFound) {
+			WriteJSONError(w, http.StatusNotFound, post.ErrPostNotFound.Error())
+			return
+		}
+		if errors.Is(err, post.ErrCommentNotFound) {
+			WriteJSONError(w, http.StatusNotFound, post.ErrCommentNotFound.Error())
+			return
+		}
+		if errors.Is(err, user.ErrUnauthorized) {
+			WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
+			return
+		}
+		WriteJSONError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	WriteJSON(w, http.StatusOK, p)
 }

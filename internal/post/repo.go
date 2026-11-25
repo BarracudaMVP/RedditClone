@@ -4,6 +4,7 @@ import (
 	"RedditClone/internal/id"
 	"RedditClone/internal/user"
 	"errors"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -18,7 +19,9 @@ type PostRepository interface {
 	GetPostsByCategory(category Category) []Post
 	GetPostByAuthorID(author id.ID) []Post
 	CreatePost(req CreatePostRequest, author user.User) (Post, error)
+	CommentExistsByID(postId id.ID, commentId id.ID) bool
 	CreateComment(req CreateCommentRequest, postId id.ID, user user.User) (Post, error)
+	DeleteComment(postId id.ID, commentId id.ID, actor user.User) (Post, error)
 }
 type MemoryPostRepository struct {
 	Posts []Post
@@ -211,10 +214,10 @@ func (repo *MemoryPostRepository) GetPostByIDAndIncrementViews(id id.ID) (Post, 
 	p.IncrementViews()
 	return *p, nil
 }
-func (repo *MemoryPostRepository) CreateComment(req CreateCommentRequest, postID id.ID, user user.User) (Post, error) {
+func (repo *MemoryPostRepository) CreateComment(req CreateCommentRequest, postId id.ID, user user.User) (Post, error) {
 	repo.mu.Lock()
 	defer repo.mu.Unlock()
-	p := repo.getPostByID(postID)
+	p := repo.getPostByID(postId)
 	if p == nil {
 		return Post{}, ErrPostNotFound
 	}
@@ -222,22 +225,56 @@ func (repo *MemoryPostRepository) CreateComment(req CreateCommentRequest, postID
 	if err != nil {
 		return Post{}, err
 	}
-	var pid id.ID
+	var cid id.ID
 	for {
-		pid, err = id.NewID()
+		cid, err = id.NewID()
 		if err != nil {
 			return Post{}, err
 		}
-		if _, ok := p.GetCommentByID(pid); !ok {
+		if _, ok := p.GetCommentByID(cid); !ok {
 			break
 		}
 	}
 	comment := Comment{
-		ID:      pid,
+		ID:      cid,
 		Author:  user,
 		Body:    req.Comment,
 		Created: time.Now(),
 	}
 	p.Comments = append(p.Comments, comment)
 	return *p, nil
+}
+func (repo *MemoryPostRepository) DeleteComment(postId id.ID, commentId id.ID, actor user.User) (Post, error) {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	p := repo.getPostByID(postId)
+	if p == nil {
+		return Post{}, ErrPostNotFound
+	}
+	c, ok := p.GetCommentByID(commentId)
+	if !ok {
+		return Post{}, ErrCommentNotFound
+	}
+	ok = p.CheckPermisson(c, actor)
+	if !ok {
+		return Post{}, user.ErrUnauthorized
+	}
+	comments := slices.Clone(p.Comments)
+	p.Comments = slices.DeleteFunc(comments, func(c Comment) bool {
+		return c.ID == commentId
+	})
+	return *p, nil
+}
+
+func (repo *MemoryPostRepository) CommentExistsByID(postId id.ID, commentId id.ID) bool {
+	repo.mu.RLock()
+	defer repo.mu.RUnlock()
+	post := repo.getPostByID(postId)
+	if post == nil {
+		return false
+	}
+	if _, ok := post.GetCommentByID(commentId); !ok {
+		return false
+	}
+	return true
 }
