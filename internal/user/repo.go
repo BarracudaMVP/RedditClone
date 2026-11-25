@@ -10,6 +10,8 @@ import (
 var ErrUserExists = errors.New("user with current username exists")
 var ErrUserNotFound = errors.New("user not found")
 
+var ErrUnauthorized = errors.New("unauthorized")
+
 type UserRepository interface {
 	Create(username Username, passwordHash string) (User, error)
 	GetByUsername(username Username) (StoredUser, error)

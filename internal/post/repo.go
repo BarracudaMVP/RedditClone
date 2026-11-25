@@ -4,6 +4,7 @@ import (
 	"RedditClone/internal/id"
 	"RedditClone/internal/user"
 	"errors"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -12,27 +13,29 @@ import (
 var ErrPostNotFound = errors.New("post not found")
 
 type PostRepository interface {
-	GetAll() []Post
-	GetByID(id id.ID) (Post, error)
-	GetCategory(category Category) []Post
-	GetByAuthorID(author id.ID) []Post
-	Create(req CreatePostRequest, author user.User) (Post, error)
+	GetAllPosts() []Post
+	PostExistsByID(id id.ID) bool
+	GetPostByIDAndIncrementViews(id id.ID) (Post, error)
+	GetPostsByCategory(category Category) []Post
+	GetPostByAuthorID(author id.ID) []Post
+	CreatePost(req CreatePostRequest, author user.User) (Post, error)
+	CommentExistsByID(postId id.ID, commentId id.ID) bool
+	CreateComment(req CreateCommentRequest, postId id.ID, user user.User) (Post, error)
+	DeleteComment(postId id.ID, commentId id.ID, actor user.User) (Post, error)
 }
 type MemoryPostRepository struct {
 	Posts []Post
 	mu    sync.RWMutex
 }
 
-func (repo *MemoryPostRepository) existsByID(id id.ID) bool {
-	for i := range repo.Posts {
-		if id == repo.Posts[i].ID {
-			return true
-		}
-	}
-	return false
+func (repo *MemoryPostRepository) PostExistsByID(id id.ID) bool {
+	repo.mu.RLock()
+	defer repo.mu.RUnlock()
+	post := repo.getPostByID(id)
+	return post != nil
 }
 
-func (repo *MemoryPostRepository) GetAll() []Post {
+func (repo *MemoryPostRepository) GetAllPosts() []Post {
 	repo.mu.RLock()
 	posts := make([]Post, len(repo.Posts))
 	copy(posts, repo.Posts)
@@ -43,7 +46,7 @@ func (repo *MemoryPostRepository) GetAll() []Post {
 	return posts
 }
 
-func (repo *MemoryPostRepository) GetCategory(c Category) []Post {
+func (repo *MemoryPostRepository) GetPostsByCategory(c Category) []Post {
 	repo.mu.RLock()
 	posts := make([]Post, len(repo.Posts))
 	copy(posts, repo.Posts)
@@ -60,7 +63,7 @@ func (repo *MemoryPostRepository) GetCategory(c Category) []Post {
 	return result
 }
 
-func (repo *MemoryPostRepository) GetByAuthorID(author id.ID) []Post {
+func (repo *MemoryPostRepository) GetPostByAuthorID(author id.ID) []Post {
 	repo.mu.RLock()
 	posts := make([]Post, len(repo.Posts))
 	copy(posts, repo.Posts)
@@ -76,18 +79,16 @@ func (repo *MemoryPostRepository) GetByAuthorID(author id.ID) []Post {
 	})
 	return result
 }
-func (repo *MemoryPostRepository) GetByID(id id.ID) (Post, error) {
-	repo.mu.Lock()
-	defer repo.mu.Unlock()
+func (repo *MemoryPostRepository) getPostByID(id id.ID) *Post {
 	for i := range repo.Posts {
 		if repo.Posts[i].ID == id {
-			repo.Posts[i].IncrementViews()
-			return repo.Posts[i], nil
+			return &repo.Posts[i]
 		}
 	}
-	return Post{}, ErrPostNotFound
+	return nil
 }
 
+// repo.Posts[i].IncrementViews()
 func NewMemoryPostRepository() *MemoryPostRepository {
 	return &MemoryPostRepository{Posts: []Post{
 		{
@@ -147,7 +148,7 @@ func NewMemoryPostRepository() *MemoryPostRepository {
 	},
 	}
 }
-func (repo *MemoryPostRepository) Create(req CreatePostRequest, author user.User) (Post, error) {
+func (repo *MemoryPostRepository) CreatePost(req CreatePostRequest, author user.User) (Post, error) {
 	repo.mu.Lock()
 	defer repo.mu.Unlock()
 	err := ValidateTitle(req.Title)
@@ -171,18 +172,18 @@ func (repo *MemoryPostRepository) Create(req CreatePostRequest, author user.User
 		return Post{}, ErrInvalidPostType
 
 	}
-	var uid id.ID
+	var pid id.ID
 	for {
-		uid, err = id.NewID()
+		pid, err = id.NewID()
 		if err != nil {
 			return Post{}, err
 		}
-		if !repo.existsByID(uid) {
+		if repo.getPostByID(pid) == nil {
 			break
 		}
 	}
 	post := Post{
-		ID:       uid,
+		ID:       pid,
 		Title:    req.Title,
 		Category: category,
 		Type:     req.Type,
@@ -202,4 +203,78 @@ func (repo *MemoryPostRepository) Create(req CreatePostRequest, author user.User
 	}
 	repo.Posts = append(repo.Posts, post)
 	return post, nil
+}
+func (repo *MemoryPostRepository) GetPostByIDAndIncrementViews(id id.ID) (Post, error) {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	p := repo.getPostByID(id)
+	if p == nil {
+		return Post{}, ErrPostNotFound
+	}
+	p.IncrementViews()
+	return *p, nil
+}
+func (repo *MemoryPostRepository) CreateComment(req CreateCommentRequest, postId id.ID, user user.User) (Post, error) {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	p := repo.getPostByID(postId)
+	if p == nil {
+		return Post{}, ErrPostNotFound
+	}
+	err := ValidateComment(req.Comment)
+	if err != nil {
+		return Post{}, err
+	}
+	var cid id.ID
+	for {
+		cid, err = id.NewID()
+		if err != nil {
+			return Post{}, err
+		}
+		if _, ok := p.GetCommentByID(cid); !ok {
+			break
+		}
+	}
+	comment := Comment{
+		ID:      cid,
+		Author:  user,
+		Body:    req.Comment,
+		Created: time.Now(),
+	}
+	p.Comments = append(p.Comments, comment)
+	return *p, nil
+}
+func (repo *MemoryPostRepository) DeleteComment(postId id.ID, commentId id.ID, actor user.User) (Post, error) {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	p := repo.getPostByID(postId)
+	if p == nil {
+		return Post{}, ErrPostNotFound
+	}
+	c, ok := p.GetCommentByID(commentId)
+	if !ok {
+		return Post{}, ErrCommentNotFound
+	}
+	ok = p.CheckPermisson(c, actor)
+	if !ok {
+		return Post{}, user.ErrUnauthorized
+	}
+	comments := slices.Clone(p.Comments)
+	p.Comments = slices.DeleteFunc(comments, func(c Comment) bool {
+		return c.ID == commentId
+	})
+	return *p, nil
+}
+
+func (repo *MemoryPostRepository) CommentExistsByID(postId id.ID, commentId id.ID) bool {
+	repo.mu.RLock()
+	defer repo.mu.RUnlock()
+	post := repo.getPostByID(postId)
+	if post == nil {
+		return false
+	}
+	if _, ok := post.GetCommentByID(commentId); !ok {
+		return false
+	}
+	return true
 }

@@ -81,12 +81,12 @@ func TestCreatePostWithExpiredToken(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/posts", body)
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("Authorization", "Bearer "+tokenString)
-	before := len(postRepo.GetAll())
+	before := len(postRepo.GetAllPosts())
 	handler.ServeHTTP(w, r)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d, body = %s", w.Code, http.StatusUnauthorized, w.Body.String())
 	}
-	if after := len(postRepo.GetAll()); after != before {
+	if after := len(postRepo.GetAllPosts()); after != before {
 		t.Errorf("post count after rejected request = %d, want = %d", after, before)
 	}
 }
@@ -115,12 +115,12 @@ func TestCreatePostWithInvalidToken(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/posts", body)
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("Authorization", "Bearer "+tokenString)
-	before := len(postRepo.GetAll())
+	before := len(postRepo.GetAllPosts())
 	handler.ServeHTTP(w, r)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d, body = %s", w.Code, http.StatusUnauthorized, w.Body.String())
 	}
-	if after := len(postRepo.GetAll()); after != before {
+	if after := len(postRepo.GetAllPosts()); after != before {
 		t.Errorf("post count after rejected request = %d, want = %d", after, before)
 	}
 }

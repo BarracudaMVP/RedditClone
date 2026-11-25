@@ -32,21 +32,21 @@ func Auth(repo user.UserRepository, secret []byte, next *http.ServeMux) http.Han
 		}
 		credits := strings.Fields(r.Header.Get("Authorization"))
 		if len(credits) != 2 || strings.ToLower(credits[0]) != "bearer" {
-			handlers.WriteJSONError(w, http.StatusUnauthorized, "unauthorized")
+			handlers.WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
 			return
 		}
 		tokenUser, err := user.ParseToken(credits[1], secret)
 		if err != nil {
-			handlers.WriteJSONError(w, http.StatusUnauthorized, "unauthorized")
+			handlers.WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
 			return
 		}
 		u, err := repo.GetByUsername(tokenUser.Username)
 		if err != nil {
-			handlers.WriteJSONError(w, http.StatusUnauthorized, "unauthorized")
+			handlers.WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
 			return
 		}
 		if u.ID != tokenUser.ID {
-			handlers.WriteJSONError(w, http.StatusUnauthorized, "unauthorized")
+			handlers.WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
 			return
 		}
 		ctx := user.ContextWithUser(r.Context(), &u.User)

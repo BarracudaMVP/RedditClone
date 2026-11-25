@@ -22,6 +22,8 @@ var ErrInvalidPostTextLength = errors.New("incorrect post text length")
 
 var ErrInvalidPostURLFormat = errors.New("incorrect post url")
 
+var ErrCommentNotFound = errors.New("comment not found")
+
 type Post struct {
 	ID               id.ID     `json:"id"`
 	Title            string    `json:"title"`
@@ -138,4 +140,17 @@ func ValidatePostURL(value string) error {
 }
 func (p *Post) IncrementViews() {
 	p.Views++
+}
+
+func (p *Post) GetCommentByID(id id.ID) (Comment, bool) {
+	for i := range p.Comments {
+		if p.Comments[i].ID == id {
+			return p.Comments[i], true
+		}
+	}
+	return Comment{}, false
+}
+
+func (p *Post) CheckPermisson(comment Comment, actor user.User) bool {
+	return actor.Admin || p.Author.ID == actor.ID || comment.Author.ID == actor.ID
 }
