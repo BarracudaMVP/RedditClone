@@ -41,7 +41,7 @@ func newMux(cfg *config.Config, postRepo post.PostRepository, userRepo user.User
 	mux.HandleFunc("GET /api/posts/{category}", postHandler.ListByCategory)
 	mux.HandleFunc("GET /api/post/{postId}", postHandler.GetPost)
 
-	//mux.HandleFunc("DELETE /api/post/{postId}", postHandler.DeletePost)
+	mux.HandleFunc("DELETE /api/post/{postId}", postHandler.DeletePost)
 
 	mux.HandleFunc("GET /api/user/{username}", postHandler.ListByUser)
 

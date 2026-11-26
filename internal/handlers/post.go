@@ -186,7 +186,7 @@ func (h *PostHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 	}
 	pid, err := id.ParseID(r.PathValue("postId"))
 	if err != nil {
-		WriteJSONError(w, http.StatusBadRequest, ErrBadRequest.Error())
+		WriteJSONError(w, http.StatusBadRequest, post.ErrInvalidPostId.Error())
 		return
 	}
 	if ok := h.postRepo.PostExistsByID(pid); !ok {
@@ -220,4 +220,35 @@ func (h *PostHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	WriteJSON(w, http.StatusOK, p)
+}
+
+func (h *PostHandler) DeletePost(w http.ResponseWriter, r *http.Request) {
+	u, err := user.UserFromContext(r.Context())
+	if err != nil {
+		WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
+		return
+	}
+	pid, err := id.ParseID(r.PathValue("postId"))
+	if err != nil {
+		WriteJSONError(w, http.StatusBadRequest, post.ErrInvalidPostId.Error())
+		return
+	}
+	if ok := h.postRepo.PostExistsByID(pid); !ok {
+		WriteJSONError(w, http.StatusNotFound, post.ErrPostNotFound.Error())
+		return
+	}
+	err = h.postRepo.DeletePost(pid, *u)
+	if err != nil {
+		if errors.Is(err, post.ErrPostNotFound) {
+			WriteJSONError(w, http.StatusNotFound, post.ErrPostNotFound.Error())
+			return
+		}
+		if errors.Is(err, user.ErrUnauthorized) {
+			WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
+			return
+		}
+		WriteJSONError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	WriteJSONSuccess(w)
 }

@@ -19,6 +19,7 @@ type PostRepository interface {
 	GetPostsByCategory(category Category) []Post
 	GetPostByAuthorID(author id.ID) []Post
 	CreatePost(req CreatePostRequest, author user.User) (Post, error)
+	DeletePost(posdId id.ID, actor user.User) error
 	CommentExistsByID(postId id.ID, commentId id.ID) bool
 	CreateComment(req CreateCommentRequest, postId id.ID, user user.User) (Post, error)
 	DeleteComment(postId id.ID, commentId id.ID, actor user.User) (Post, error)
@@ -255,7 +256,7 @@ func (repo *MemoryPostRepository) DeleteComment(postId id.ID, commentId id.ID, a
 	if !ok {
 		return Post{}, ErrCommentNotFound
 	}
-	ok = p.CheckPermisson(c, actor)
+	ok = p.CheckPermissonForComment(c, actor)
 	if !ok {
 		return Post{}, user.ErrUnauthorized
 	}
@@ -277,4 +278,21 @@ func (repo *MemoryPostRepository) CommentExistsByID(postId id.ID, commentId id.I
 		return false
 	}
 	return true
+}
+func (repo *MemoryPostRepository) DeletePost(postId id.ID, actor user.User) error {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	p := repo.getPostByID(postId)
+	if p == nil {
+		return ErrPostNotFound
+	}
+	ok := p.CheckPermissonForPost(actor)
+	if !ok {
+		return user.ErrUnauthorized
+	}
+	posts := slices.Clone(repo.Posts)
+	repo.Posts = slices.DeleteFunc(posts, func(p Post) bool {
+		return p.ID == postId
+	})
+	return nil
 }

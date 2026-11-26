@@ -24,6 +24,8 @@ var ErrInvalidPostURLFormat = errors.New("incorrect post url")
 
 var ErrCommentNotFound = errors.New("comment not found")
 
+var ErrInvalidPostId = errors.New("invalid post id")
+
 type Post struct {
 	ID               id.ID     `json:"id"`
 	Title            string    `json:"title"`
@@ -151,6 +153,9 @@ func (p *Post) GetCommentByID(id id.ID) (Comment, bool) {
 	return Comment{}, false
 }
 
-func (p *Post) CheckPermisson(comment Comment, actor user.User) bool {
+func (p *Post) CheckPermissonForComment(comment Comment, actor user.User) bool {
 	return actor.Admin || p.Author.ID == actor.ID || comment.Author.ID == actor.ID
+}
+func (p *Post) CheckPermissonForPost(actor user.User) bool {
+	return actor.Admin || p.Author.ID == actor.ID
 }
