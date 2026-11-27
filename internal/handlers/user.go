@@ -31,10 +31,10 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var form user.Credentials
+	var form *user.Credentials
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-	if err := decoder.Decode(&form); err != nil {
-		WriteJSONError(w, http.StatusBadRequest, "bad request")
+	if err := decoder.Decode(&form); err != nil || form == nil {
+		WriteJSONError(w, http.StatusBadRequest, ErrBadRequest.Error())
 		return
 	}
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
@@ -87,10 +87,10 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var form user.Credentials
+	var form *user.Credentials
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-	if err := decoder.Decode(&form); err != nil {
-		WriteJSONError(w, http.StatusBadRequest, "bad request")
+	if err := decoder.Decode(&form); err != nil || form == nil {
+		WriteJSONError(w, http.StatusBadRequest, ErrBadRequest.Error())
 		return
 	}
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {

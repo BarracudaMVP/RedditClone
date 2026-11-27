@@ -70,9 +70,9 @@ func (h *PostHandler) CreatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var form post.CreatePostRequest
+	var form *post.CreatePostRequest
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-	if err := decoder.Decode(&form); err != nil {
+	if err := decoder.Decode(&form); err != nil || form == nil {
 		WriteJSONError(w, http.StatusBadRequest, ErrBadRequest.Error())
 		return
 	}
@@ -103,7 +103,7 @@ func (h *PostHandler) CreatePost(w http.ResponseWriter, r *http.Request) {
 		WriteJSONValidationError(w, validateErrors)
 		return
 	}
-	post, err := h.postRepo.CreatePost(form, *u)
+	post, err := h.postRepo.CreatePost(*form, *u)
 	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "internal server error")
 		return
@@ -149,9 +149,9 @@ func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var form post.CreateCommentRequest
+	var form *post.CreateCommentRequest
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-	if err := decoder.Decode(&form); err != nil {
+	if err := decoder.Decode(&form); err != nil || form == nil {
 		WriteJSONError(w, http.StatusBadRequest, ErrBadRequest.Error())
 		return
 	}
@@ -166,7 +166,7 @@ func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		WriteJSONValidationError(w, validateErrors)
 		return
 	}
-	p, err := h.postRepo.CreateComment(form, pid, *u)
+	p, err := h.postRepo.CreateComment(*form, pid, *u)
 	if err != nil {
 		if errors.Is(err, post.ErrPostNotFound) {
 			WriteJSONError(w, http.StatusNotFound, post.ErrPostNotFound.Error())
