@@ -3,14 +3,11 @@ package post
 import (
 	"RedditClone/internal/id"
 	"RedditClone/internal/user"
-	"errors"
 	"slices"
 	"sort"
 	"sync"
 	"time"
 )
-
-var ErrPostNotFound = errors.New("post not found")
 
 type PostRepository interface {
 	GetAllPosts() []Post
@@ -19,9 +16,12 @@ type PostRepository interface {
 	GetPostsByCategory(category Category) []Post
 	GetPostByAuthorID(author id.ID) []Post
 	CreatePost(req CreatePostRequest, author user.User) (Post, error)
+	DeletePost(posdId id.ID, actor user.User) error
 	CommentExistsByID(postId id.ID, commentId id.ID) bool
 	CreateComment(req CreateCommentRequest, postId id.ID, user user.User) (Post, error)
 	DeleteComment(postId id.ID, commentId id.ID, actor user.User) (Post, error)
+	VotePost(postId id.ID, actor user.User, value VoteValue) (Post, error)
+	UnvotePost(postId id.ID, actor user.User) (Post, error)
 }
 type MemoryPostRepository struct {
 	Posts []Post
@@ -123,7 +123,7 @@ func NewMemoryPostRepository() *MemoryPostRepository {
 				ID:       "507f1f77bcf86cd799439011",
 				Username: "alice",
 			},
-			Score: 0,
+			Score: 1,
 			Votes: []Vote{
 				{
 					User: "507f1f77bcf86cd799439011",
@@ -183,19 +183,15 @@ func (repo *MemoryPostRepository) CreatePost(req CreatePostRequest, author user.
 		}
 	}
 	post := Post{
-		ID:       pid,
-		Title:    req.Title,
-		Category: category,
-		Type:     req.Type,
-		URL:      req.URL,
-		Text:     req.Text,
-		Author:   author,
-		Score:    1,
-		Votes: []Vote{{
-			User: author.ID,
-			Vote: 1,
-		},
-		},
+		ID:               pid,
+		Title:            req.Title,
+		Category:         category,
+		Type:             req.Type,
+		URL:              req.URL,
+		Text:             req.Text,
+		Author:           author,
+		Score:            1,
+		Votes:            []Vote{{User: author.ID, Vote: 1}},
 		Comments:         []Comment{},
 		Created:          time.Now(),
 		Views:            0,
@@ -255,7 +251,7 @@ func (repo *MemoryPostRepository) DeleteComment(postId id.ID, commentId id.ID, a
 	if !ok {
 		return Post{}, ErrCommentNotFound
 	}
-	ok = p.CheckPermisson(c, actor)
+	ok = p.CheckPermissonForComment(c, actor)
 	if !ok {
 		return Post{}, user.ErrUnauthorized
 	}
@@ -277,4 +273,49 @@ func (repo *MemoryPostRepository) CommentExistsByID(postId id.ID, commentId id.I
 		return false
 	}
 	return true
+}
+func (repo *MemoryPostRepository) DeletePost(postId id.ID, actor user.User) error {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	p := repo.getPostByID(postId)
+	if p == nil {
+		return ErrPostNotFound
+	}
+	ok := p.CheckPermissonForPost(actor)
+	if !ok {
+		return user.ErrUnauthorized
+	}
+	posts := slices.Clone(repo.Posts)
+	repo.Posts = slices.DeleteFunc(posts, func(p Post) bool {
+		return p.ID == postId
+	})
+	return nil
+}
+func (repo *MemoryPostRepository) VotePost(postId id.ID, actor user.User, value VoteValue) (Post, error) {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	p := repo.getPostByID(postId)
+	if p == nil {
+		return Post{}, ErrPostNotFound
+	}
+	p.SetUserVote(actor, value)
+	p.UpdateScore()
+	p.CalculateUpvotePercentage()
+	return *p, nil
+}
+func (repo *MemoryPostRepository) UnvotePost(postId id.ID, actor user.User) (Post, error) {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	p := repo.getPostByID(postId)
+	if p == nil {
+		return Post{}, ErrPostNotFound
+	}
+	votes := slices.Clone(p.Votes)
+	p.Votes = slices.DeleteFunc(votes, func(v Vote) bool {
+		return v.User == actor.ID
+	})
+	p.UserUnvote(actor)
+	p.UpdateScore()
+	p.CalculateUpvotePercentage()
+	return *p, nil
 }

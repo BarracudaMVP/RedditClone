@@ -50,3 +50,7 @@ func WriteJSON(w http.ResponseWriter, status int, value any) {
 		log.Printf("encode response: %v", err)
 	}
 }
+
+func WriteJSONSuccess(w http.ResponseWriter) {
+	WriteJSON(w, http.StatusOK, map[string]string{"message": "success"})
+}

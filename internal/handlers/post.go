@@ -186,7 +186,7 @@ func (h *PostHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 	}
 	pid, err := id.ParseID(r.PathValue("postId"))
 	if err != nil {
-		WriteJSONError(w, http.StatusBadRequest, ErrBadRequest.Error())
+		WriteJSONError(w, http.StatusBadRequest, post.ErrInvalidPostId.Error())
 		return
 	}
 	if ok := h.postRepo.PostExistsByID(pid); !ok {
@@ -210,6 +210,145 @@ func (h *PostHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, post.ErrCommentNotFound) {
 			WriteJSONError(w, http.StatusNotFound, post.ErrCommentNotFound.Error())
+			return
+		}
+		if errors.Is(err, user.ErrUnauthorized) {
+			WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
+			return
+		}
+		WriteJSONError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	WriteJSON(w, http.StatusOK, p)
+}
+
+func (h *PostHandler) DeletePost(w http.ResponseWriter, r *http.Request) {
+	u, err := user.UserFromContext(r.Context())
+	if err != nil {
+		WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
+		return
+	}
+	pid, err := id.ParseID(r.PathValue("postId"))
+	if err != nil {
+		WriteJSONError(w, http.StatusBadRequest, post.ErrInvalidPostId.Error())
+		return
+	}
+	if ok := h.postRepo.PostExistsByID(pid); !ok {
+		WriteJSONError(w, http.StatusNotFound, post.ErrPostNotFound.Error())
+		return
+	}
+	err = h.postRepo.DeletePost(pid, *u)
+	if err != nil {
+		if errors.Is(err, post.ErrPostNotFound) {
+			WriteJSONError(w, http.StatusNotFound, post.ErrPostNotFound.Error())
+			return
+		}
+		if errors.Is(err, user.ErrUnauthorized) {
+			WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
+			return
+		}
+		WriteJSONError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	WriteJSONSuccess(w)
+}
+
+func (h *PostHandler) UpvotePost(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	u, err := user.UserFromContext(r.Context())
+	if err != nil {
+		WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
+		return
+	}
+	pid, err := id.ParseID(r.PathValue("postId"))
+	if err != nil {
+		WriteJSONError(w, http.StatusBadRequest, post.ErrInvalidPostId.Error())
+		return
+	}
+	if ok := h.postRepo.PostExistsByID(pid); !ok {
+		WriteJSONError(w, http.StatusNotFound, post.ErrPostNotFound.Error())
+		return
+	}
+	p, err := h.postRepo.VotePost(pid, *u, post.Upvote)
+	if err != nil {
+		if errors.Is(err, post.ErrPostNotFound) {
+			WriteJSONError(w, http.StatusNotFound, post.ErrPostNotFound.Error())
+			return
+		}
+		if errors.Is(err, user.ErrUnauthorized) {
+			WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
+			return
+		}
+		WriteJSONError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	WriteJSON(w, http.StatusOK, p)
+}
+
+func (h *PostHandler) DownvotePost(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	u, err := user.UserFromContext(r.Context())
+	if err != nil {
+		WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
+		return
+	}
+	pid, err := id.ParseID(r.PathValue("postId"))
+	if err != nil {
+		WriteJSONError(w, http.StatusBadRequest, post.ErrInvalidPostId.Error())
+		return
+	}
+	if ok := h.postRepo.PostExistsByID(pid); !ok {
+		WriteJSONError(w, http.StatusNotFound, post.ErrPostNotFound.Error())
+		return
+	}
+	p, err := h.postRepo.VotePost(pid, *u, post.Downvote)
+	if err != nil {
+		if errors.Is(err, post.ErrPostNotFound) {
+			WriteJSONError(w, http.StatusNotFound, post.ErrPostNotFound.Error())
+			return
+		}
+		if errors.Is(err, user.ErrUnauthorized) {
+			WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
+			return
+		}
+		WriteJSONError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	WriteJSON(w, http.StatusOK, p)
+}
+
+func (h *PostHandler) UnvotePost(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	u, err := user.UserFromContext(r.Context())
+	if err != nil {
+		WriteJSONError(w, http.StatusUnauthorized, user.ErrUnauthorized.Error())
+		return
+	}
+	pid, err := id.ParseID(r.PathValue("postId"))
+	if err != nil {
+		WriteJSONError(w, http.StatusBadRequest, post.ErrInvalidPostId.Error())
+		return
+	}
+	if ok := h.postRepo.PostExistsByID(pid); !ok {
+		WriteJSONError(w, http.StatusNotFound, post.ErrPostNotFound.Error())
+		return
+	}
+	p, err := h.postRepo.UnvotePost(pid, *u)
+	if err != nil {
+		if errors.Is(err, post.ErrPostNotFound) {
+			WriteJSONError(w, http.StatusNotFound, post.ErrPostNotFound.Error())
 			return
 		}
 		if errors.Is(err, user.ErrUnauthorized) {
